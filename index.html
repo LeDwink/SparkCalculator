@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spark Helper Prototype</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+  <script src="aiParser.js" defer></script>
+  <script src="routeService.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Spark Helper Prototype</p>
+        <h1>Offer Check</h1>
+      </div>
+      <button class="icon-button" id="themeResetButton" type="button" aria-label="Reset app">Reset</button>
+    </header>
+
+    <section class="top-workflow" id="scan" aria-labelledby="scan-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="scan-title">Screenshots</h2>
+          <p>Scan the offer, then check the route numbers.</p>
+        </div>
+        <span id="ocrStatus" class="status-pill">Ready</span>
+      </div>
+
+      <label class="upload-button" for="screenshotInput">Upload Screenshot(s)</label>
+      <input id="screenshotInput" type="file" accept="image/*" multiple>
+
+      <div class="workflow-actions">
+        <button class="primary-button" id="analyzeButton" type="button">Analyze Screenshot(s)</button>
+        <button class="secondary-button" id="clearScreenshotsButton" type="button">Remove Screenshot(s)</button>
+      </div>
+
+      <div id="previewList" class="preview-list" aria-live="polite"></div>
+      <p class="parser-message" id="parserMessage"></p>
+    </section>
+
+    <section class="result-card verdict-bad" id="resultCard" aria-live="polite">
+      <div class="verdict-strip">
+        <p class="verdict-label" id="verdictLabel">Bad Offer</p>
+        <span id="routeSource">Manual route</span>
+      </div>
+      <div class="hero-number">
+        <span>Estimated Hourly AFTER GAS</span>
+        <strong id="hourlyAfterGas">$0.00/hr</strong>
+      </div>
+      <div class="primary-time">
+        <span id="mainTimeLabel">Estimated Trip Time</span>
+        <strong id="mainTimeValue">0 min</strong>
+      </div>
+      <div class="result-grid">
+        <div>
+          <span>Google Drive Time</span>
+          <strong id="driveTimeResult">0 min</strong>
+        </div>
+        <div>
+          <span>Google Return Time</span>
+          <strong id="returnTimeResult">0 min</strong>
+        </div>
+        <div>
+          <span>Fuel Cost</span>
+          <strong id="fuelCost">$0.00</strong>
+        </div>
+        <div>
+          <span>Pay After Gas</span>
+          <strong id="payAfterGas">$0.00</strong>
+        </div>
+        <div>
+          <span>Pay Per Mile</span>
+          <strong id="payPerMile">$0.00/mi</strong>
+        </div>
+        <div>
+          <span>Stop Time</span>
+          <strong id="stopTimeResult">0 min</strong>
+        </div>
+      </div>
+      <button class="route-button" id="getRouteButton" type="button">Get Google Route Time</button>
+      <p class="route-message" id="routeMessage"></p>
+      <div class="warning-list" id="warningList" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel detected-card is-hidden" id="detectedCard" aria-labelledby="detected-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="detected-title">Detected Offer Info</h2>
+          <p>Edit anything OCR got wrong. Changes are remembered locally.</p>
+        </div>
+      </div>
+      <div class="detected-grid">
+        <label>
+          <span>Payout</span>
+          <input id="detectedPayout" data-detected-field="payout" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Not found">
+        </label>
+        <label>
+          <span>Spark miles</span>
+          <input id="detectedMiles" data-detected-field="sparkMiles" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Not found">
+        </label>
+        <label>
+          <span>Spark minutes</span>
+          <input id="detectedMinutes" data-detected-field="sparkMinutes" type="number" inputmode="numeric" min="0" step="1" placeholder="Reference only">
+        </label>
+        <label>
+          <span>Stops</span>
+          <input id="detectedStops" data-detected-field="stops" type="number" inputmode="numeric" min="0" step="1" placeholder="Not found">
+        </label>
+        <label class="wide">
+          <span>Pickup/store text</span>
+          <textarea id="detectedPickup" data-detected-field="pickupText" rows="2" placeholder="Not found"></textarea>
+        </label>
+        <label class="wide">
+          <span>Dropoff/location text</span>
+          <textarea id="detectedDropoffs" data-detected-field="dropoffText" rows="3" placeholder="Not found"></textarea>
+        </label>
+      </div>
+      <p class="confidence-line" id="detectedConfidence">Confidence levels appear after OCR.</p>
+      <div class="detected-actions">
+        <button class="primary-button" id="useDetectedButton" type="button">Use These Values</button>
+        <button class="primary-button" id="calculateDetectedButton" type="button">Calculate</button>
+      </div>
+    </section>
+
+    <section class="panel" id="route" aria-labelledby="route-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="route-title">Route Estimate</h2>
+          <p>Google route fields are manual for now, ready for a future Routes API backend.</p>
+        </div>
+      </div>
+      <form id="calculatorForm">
+        <div class="field-grid">
+          <label>
+            <span>Payout</span>
+            <input id="payout" type="number" inputmode="decimal" min="0" step="0.01" placeholder="30.00">
+          </label>
+          <label>
+            <span>Miles</span>
+            <input id="sparkMiles" type="number" inputmode="decimal" min="0" step="0.1" placeholder="15.2">
+          </label>
+          <label>
+            <span>Stops</span>
+            <input id="stops" type="number" inputmode="numeric" min="0" step="1" placeholder="3">
+          </label>
+          <label>
+            <span>Google Drive Time</span>
+            <input id="driveTime" type="number" inputmode="numeric" min="0" step="1" placeholder="45">
+          </label>
+          <label>
+            <span>Google Return Time</span>
+            <input id="returnTime" type="number" inputmode="numeric" min="0" step="1" placeholder="25">
+          </label>
+          <label>
+            <span>Return miles</span>
+            <input id="returnMiles" type="number" inputmode="decimal" min="0" step="0.1" placeholder="15.2">
+          </label>
+        </div>
+        <div class="quick-row">
+          <button type="button" id="matchReturnButton">Return miles = miles</button>
+          <button type="button" id="addStopButton">+1 stop</button>
+          <button type="button" id="removeStopButton">-1 stop</button>
+        </div>
+        <div class="action-row">
+          <button class="secondary-button" id="clearButton" type="button">Clear Fields</button>
+          <button class="primary-button" type="submit">Calculate</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" id="settings" aria-labelledby="settings-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="settings-title">Settings</h2>
+          <p>Your defaults stay on this device.</p>
+        </div>
+      </div>
+      <div class="field-grid">
+        <label class="wide">
+          <span>Preferred Walmart</span>
+          <input id="preferredWalmart" type="text" placeholder="Walmart OLEAN #2159">
+        </label>
+        <label class="wide">
+          <span>Backend API URL</span>
+          <input id="backendApiUrl" type="url" placeholder="https://my-worker-name.my-account.workers.dev">
+        </label>
+        <label>
+          <span>Minutes Per Stop</span>
+          <input id="unloadMinutes" type="number" inputmode="numeric" min="0" step="1" value="3">
+        </label>
+        <label>
+          <span>Gas Price</span>
+          <input id="gasPrice" type="number" inputmode="decimal" min="0" step="0.01" value="3.50">
+        </label>
+        <label>
+          <span>MPG</span>
+          <input id="mpg" type="number" inputmode="decimal" min="1" step="0.1" value="24">
+        </label>
+        <label>
+          <span>Minimum Acceptable Hourly</span>
+          <input id="minAcceptableHourly" type="number" inputmode="decimal" min="0" step="1" value="15">
+        </label>
+        <label>
+          <span>Good Hourly</span>
+          <input id="minimumGoodHourly" type="number" inputmode="decimal" min="0" step="1" value="20">
+        </label>
+        <label class="wide">
+          <span>Main Time Display</span>
+          <select id="mainTimeDisplay">
+            <option value="total">Total Estimated Trip Time</option>
+            <option value="drive">Google Drive Time Only</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel debug-panel" id="debug" aria-labelledby="debug-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="debug-title">Data & Debug</h2>
+          <p>Export local debug data when you want to improve OCR or route parsing later.</p>
+        </div>
+        <div class="debug-actions">
+          <button class="small-button" id="exportDebugButton" type="button">Export Debug JSON</button>
+          <button class="small-button danger-button" id="clearDebugButton" type="button">Clear Local Debug Data</button>
+        </div>
+      </div>
+      <dl class="analytics-grid">
+        <div>
+          <dt>Total screenshots analyzed</dt>
+          <dd id="analyticsScreenshots">0</dd>
+        </div>
+        <div>
+          <dt>Total corrections made</dt>
+          <dd id="analyticsCorrections">0</dd>
+        </div>
+        <div>
+          <dt>Correction rate</dt>
+          <dd id="analyticsRate">0%</dd>
+        </div>
+        <div>
+          <dt>Most corrected field</dt>
+          <dd id="analyticsMostField">None</dd>
+        </div>
+        <div>
+          <dt>Payout corrections</dt>
+          <dd id="analyticsPayout">0</dd>
+        </div>
+        <div>
+          <dt>Miles corrections</dt>
+          <dd id="analyticsMiles">0</dd>
+        </div>
+        <div>
+          <dt>Stops corrections</dt>
+          <dd id="analyticsStops">0</dd>
+        </div>
+        <div>
+          <dt>Minutes corrections</dt>
+          <dd id="analyticsMinutes">0</dd>
+        </div>
+        <div class="wide">
+          <dt>Address/location corrections</dt>
+          <dd id="analyticsAddresses">0</dd>
+        </div>
+      </dl>
+
+      <details class="debug-box">
+        <summary>Extracted text debug</summary>
+        <pre id="ocrText">No OCR text yet.</pre>
+      </details>
+      <div class="location-box">
+        <h3>Detected location text</h3>
+        <p id="locationText">No city, location, or address text detected yet.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <a href="#scan">Scan</a>
+    <a href="#route">Route</a>
+    <a href="#settings">Settings</a>
+    <a href="#debug">Data</a>
+  </nav>
+</body>
+</html>

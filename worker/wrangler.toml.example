@@ -1,0 +1,6 @@
+name = "spark-helper-route-worker"
+main = "index.js"
+compatibility_date = "2026-06-19"
+
+# Set the actual secret with:
+# wrangler secret put GOOGLE_MAPS_API_KEY
