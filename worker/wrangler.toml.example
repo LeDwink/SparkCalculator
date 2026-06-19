@@ -1,4 +1,4 @@
-name = "spark-helper-route-worker"
+name = "routeworth-route-worker"
 main = "index.js"
 compatibility_date = "2026-06-19"
 

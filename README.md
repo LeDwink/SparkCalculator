@@ -1,6 +1,6 @@
-# Spark Helper Prototype
+# RouteWorth
 
-Spark Helper Prototype is a mobile-friendly static web app for checking Spark offers quickly in a browser.
+RouteWorth is a mobile-friendly static web app for checking Spark offers quickly in a browser.
 
 It is designed for Cloudflare Pages:
 
@@ -14,44 +14,62 @@ It is designed for Cloudflare Pages:
 1. Upload screenshot(s).
 2. Analyze screenshot(s) with browser OCR.
 3. Review detected payout, miles, stops, store text, and dropoff text.
-4. Press **Get Google Route Time** if a backend URL is configured.
-5. Review **Estimated Hourly AFTER GAS** near the top of the page.
-6. Export debug JSON when you want to improve the parser later.
+4. Edit the Store/Walmart address and Stop addresses if needed.
+5. Press **Get Google Route Time** or **Use Manual Times**.
+6. Review **Estimated Hourly AFTER GAS** near the top of the page.
+7. Export debug JSON when you want to improve the parser later.
 
-## Google Route Backend
+## Settings
 
-The frontend can call a backend endpoint:
+Settings are saved in browser `localStorage`:
 
-```text
-POST /api/route-estimate
-```
+- Backend API URL
+- Preferred Walmart/store address
+- Minutes per stop
+- MPG
+- Gas price
+- Minimum acceptable hourly
+- Good hourly
 
-Set the Worker URL in **Settings → Backend API URL**.
-
-Example:
+Backend API URL example:
 
 ```text
 https://my-worker-name.my-account.workers.dev
 ```
 
-The frontend sends:
+## Google Route Backend
+
+The frontend calls:
+
+```text
+POST /api/route-estimate
+```
+
+Request body:
 
 ```json
 {
   "storeAddress": "string",
-  "stopAddresses": ["string"],
+  "stopAddresses": ["string", "string"],
   "returnToStore": true
 }
 ```
 
-The Worker returns Google drive time, return time, total distance, and route legs. The frontend then auto-fills:
+Expected response:
 
-- Google Drive Time
-- Google Return Time
-- Route miles
-- Return miles, when the return leg is available
+```json
+{
+  "success": true,
+  "driveTimeMinutes": 0,
+  "returnTimeMinutes": 0,
+  "totalGoogleDriveMinutes": 0,
+  "totalDistanceMiles": 0,
+  "legs": [],
+  "warnings": []
+}
+```
 
-If no backend URL is set, manual route times still work.
+The app auto-fills drive time, return time, total miles, and return miles when possible.
 
 ## Calculation
 
@@ -67,24 +85,33 @@ When a Google route estimate exists, fuel cost uses `totalDistanceMiles` from th
 
 ## Data & Debug
 
-The app stores local debug records in browser `localStorage`.
+RouteWorth stores local debug events in browser `localStorage` for:
 
-Records are created for:
+- `screenshot_analysis`
+- `route_estimate_request`
+- `route_estimate_response`
+- `correction`
+- `calculation`
 
-- Screenshot analysis
-- Route estimates
-- User corrections
-- Manual calculations
+The Data & Debug section shows:
 
-Use **Export Debug JSON** to download all records as:
+- Total screenshots analyzed
+- Total route estimates requested
+- Total corrections made
+- Last OCR raw text
+- Last detected values
+- Last route response
+- Last calculation result
+
+Use **Export Debug JSON** to download all local records as:
 
 ```text
 spark-helper-debug-YYYY-MM-DD.json
 ```
 
-Use **Clear Local Debug Data** to remove local debug records.
+Use **Clear Debug Data** to remove local debug records.
 
-Screenshots and debug records are not uploaded automatically.
+Debug data and screenshots are not uploaded automatically.
 
 ## Frontend Files
 
@@ -116,5 +143,6 @@ OCR requires internet access because Tesseract.js loads from a CDN. Manual entry
 3. Use no build command.
 4. Use `/` as the output directory.
 5. Deploy.
+6. Open RouteWorth and paste the Worker URL into **Settings > Backend API URL**.
 
 Open the deployed Pages URL on iPhone Safari or Android Chrome. No app install is required.

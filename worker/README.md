@@ -1,6 +1,6 @@
-# Spark Helper Cloudflare Worker
+# RouteWorth Cloudflare Worker
 
-This Worker provides the backend route endpoint for Spark Helper Prototype.
+This Worker provides the Google route estimate endpoint for RouteWorth.
 
 Endpoint:
 
@@ -19,6 +19,8 @@ Request body:
 ```
 
 The Worker calls Google Routes API using a server-side secret named `GOOGLE_MAPS_API_KEY`.
+
+The frontend never stores or sends the Google API key.
 
 ## Deploy Frontend to Cloudflare Pages
 
@@ -59,17 +61,15 @@ wrangler secret put GOOGLE_MAPS_API_KEY
 
 Paste your Google Maps / Routes API key when prompted.
 
-Do not put the Google API key in frontend code.
-
-## Connect the App
+## Connect Worker to RouteWorth
 
 1. Copy the deployed Worker URL, for example:
 
 ```text
-https://spark-helper-route-worker.your-account.workers.dev
+https://routeworth-worker.your-account.workers.dev
 ```
 
-2. Open Spark Helper Prototype.
+2. Open RouteWorth.
 3. Go to **Settings**.
 4. Paste the Worker URL into **Backend API URL**.
 5. Upload and analyze screenshots.

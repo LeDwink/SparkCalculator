@@ -16,7 +16,9 @@ const fields = {
   minimumGoodHourly: document.querySelector("#minimumGoodHourly"),
   preferredWalmart: document.querySelector("#preferredWalmart"),
   backendApiUrl: document.querySelector("#backendApiUrl"),
-  mainTimeDisplay: document.querySelector("#mainTimeDisplay")
+  mainTimeDisplay: document.querySelector("#mainTimeDisplay"),
+  routeStoreAddress: document.querySelector("#routeStoreAddress"),
+  routeStopAddresses: document.querySelector("#routeStopAddresses")
 };
 
 const detectedInputs = {
@@ -44,6 +46,7 @@ const useDetectedButton = document.querySelector("#useDetectedButton");
 const calculateDetectedButton = document.querySelector("#calculateDetectedButton");
 const clearScreenshotsButton = document.querySelector("#clearScreenshotsButton");
 const getRouteButton = document.querySelector("#getRouteButton");
+const useManualTimesButton = document.querySelector("#useManualTimesButton");
 const exportDebugButton = document.querySelector("#exportDebugButton");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 
@@ -158,14 +161,16 @@ function writeDebugRecords(records) {
 }
 
 function getStopAddresses() {
-  return detectedInputs.dropoffText.value
+  const routeText = fields.routeStopAddresses.value.trim();
+  const sourceText = routeText || detectedInputs.dropoffText.value;
+  return sourceText
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
 }
 
 function getStoreAddress() {
-  return detectedInputs.pickupText.value.trim() || fields.preferredWalmart.value.trim();
+  return fields.routeStoreAddress.value.trim() || detectedInputs.pickupText.value.trim() || fields.preferredWalmart.value.trim();
 }
 
 function getDetectedValues() {
@@ -265,6 +270,7 @@ function fieldGroup(fieldName) {
 function summarizeCorrections() {
   const records = readDebugRecords();
   const correctionRecords = records.filter((record) => record.eventType === "correction");
+  const routeRequestCount = records.filter((record) => record.eventType === "route_estimate_request").length;
   const screenshotCount = records
     .filter((record) => record.eventType === "screenshot_analysis")
     .reduce((sum, record) => sum + (Number(record.screenshotCount) || 1), 0);
@@ -289,6 +295,7 @@ function summarizeCorrections() {
 
   return {
     screenshotsAnalyzed: screenshotCount,
+    routeRequests: routeRequestCount,
     totalCorrections: correctionRecords.length,
     correctionRate: screenshotCount ? correctionRecords.length / screenshotCount : 0,
     mostCorrectedField: mostCorrected ? `${mostCorrected[0]} (${mostCorrected[1]})` : "None",
@@ -299,6 +306,7 @@ function summarizeCorrections() {
 function renderAnalytics() {
   const summary = summarizeCorrections();
   document.querySelector("#analyticsScreenshots").textContent = summary.screenshotsAnalyzed;
+  document.querySelector("#analyticsRouteRequests").textContent = summary.routeRequests;
   document.querySelector("#analyticsCorrections").textContent = summary.totalCorrections;
   document.querySelector("#analyticsRate").textContent = percent(summary.correctionRate);
   document.querySelector("#analyticsMostField").textContent = summary.mostCorrectedField;
@@ -307,6 +315,36 @@ function renderAnalytics() {
   document.querySelector("#analyticsStops").textContent = summary.counts.stops;
   document.querySelector("#analyticsMinutes").textContent = summary.counts.minutes;
   document.querySelector("#analyticsAddresses").textContent = summary.counts.addresses;
+  renderDebugSnapshots();
+}
+
+function findLastRecord(eventType) {
+  const records = readDebugRecords();
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    if (records[index].eventType === eventType) return records[index];
+  }
+  return null;
+}
+
+function setDebugJson(selector, value) {
+  const element = document.querySelector(selector);
+  if (!element) return;
+  element.textContent = value ? JSON.stringify(value, null, 2) : "None yet.";
+}
+
+function renderDebugSnapshots() {
+  const lastScreenshot = findLastRecord("screenshot_analysis");
+  const lastRouteResponse = findLastRecord("route_estimate_response");
+  const lastCalculation = findLastRecord("calculation");
+
+  const lastOcr = document.querySelector("#debugLastOcr");
+  if (lastOcr) lastOcr.textContent = lastScreenshot?.rawOcrText || "None yet.";
+  setDebugJson("#debugLastDetected", lastScreenshot?.detectedValues || null);
+  setDebugJson("#debugLastRoute", lastRouteResponse?.routeError ? {
+    error: lastRouteResponse.routeError,
+    routeEstimate: lastRouteResponse.routeEstimate
+  } : lastRouteResponse?.routeEstimate || null);
+  setDebugJson("#debugLastCalculation", lastCalculation?.calculationResult || null);
 }
 
 function recordCorrection(fieldName, originalValue, correctedValue) {
@@ -533,6 +571,14 @@ function useDetectedValues() {
     if (storeLine) fields.preferredWalmart.value = storeLine.trim();
   }
 
+  if (!hasValue(fields.routeStoreAddress) && detected.pickupText) {
+    fields.routeStoreAddress.value = detected.pickupText;
+  }
+
+  if (!hasValue(fields.routeStopAddresses) && detected.dropoffText) {
+    fields.routeStopAddresses.value = detected.dropoffText;
+  }
+
   updateLocationTextFromDetected();
   saveSettings();
   calculate();
@@ -600,7 +646,7 @@ function applyRouteEstimate(route) {
 async function getGoogleRouteTime() {
   const backendApiUrl = fields.backendApiUrl.value.trim();
   if (!backendApiUrl) {
-    routeMessage.textContent = "Backend API URL not set. Enter route times manually or add a backend URL in settings.";
+    routeMessage.textContent = "Backend API URL not set. Enter it in Settings or use manual times.";
     return;
   }
 
@@ -614,24 +660,37 @@ async function getGoogleRouteTime() {
   getRouteButton.disabled = true;
   routeMessage.textContent = "Getting Google route estimate...";
 
+  const requestBody = {
+    storeAddress,
+    stopAddresses,
+    returnToStore: true
+  };
+
+  saveDebugRecord("route_estimate_request", {
+    routeRequest: requestBody
+  });
+
   try {
-    const route = await window.SparkRouteService.requestGoogleRouteEstimate(backendApiUrl, {
-      storeAddress,
-      stopAddresses,
-      returnToStore: true
-    });
+    const route = await window.SparkRouteService.requestGoogleRouteEstimate(backendApiUrl, requestBody);
     applyRouteEstimate(route);
-    saveDebugRecord("route_estimate");
+    saveDebugRecord("route_estimate_response");
     routeMessage.textContent = "Google route estimate added.";
     resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     routeMessage.textContent = "Google route estimate failed. Manual times are still available.";
-    saveDebugRecord("route_estimate", {
+    saveDebugRecord("route_estimate_response", {
       routeError: error.message || String(error)
     });
   } finally {
     getRouteButton.disabled = false;
   }
+}
+
+function useManualTimes() {
+  lastRouteEstimate = null;
+  routeMessage.textContent = "Manual route times are active.";
+  calculate({ record: true });
+  resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearScreenshots() {
@@ -691,6 +750,7 @@ screenshotInput.addEventListener("change", () => {
 analyzeButton.addEventListener("click", analyzeScreenshots);
 clearScreenshotsButton.addEventListener("click", clearScreenshots);
 getRouteButton.addEventListener("click", getGoogleRouteTime);
+useManualTimesButton.addEventListener("click", useManualTimes);
 useDetectedButton.addEventListener("click", useDetectedValues);
 calculateDetectedButton.addEventListener("click", () => {
   useDetectedValues();
@@ -722,7 +782,7 @@ Object.entries(fields).forEach(([fieldName, field]) => {
     if (["preferredWalmart", "backendApiUrl", "unloadMinutes", "gasPrice", "mpg", "minAcceptableHourly", "minimumGoodHourly", "mainTimeDisplay"].includes(fieldName)) {
       saveSettings();
     }
-    if (["sparkMiles", "returnMiles", "driveTime", "returnTime"].includes(fieldName)) {
+    if (["sparkMiles", "returnMiles", "driveTime", "returnTime", "routeStoreAddress", "routeStopAddresses"].includes(fieldName)) {
       lastRouteEstimate = null;
     }
     calculate();

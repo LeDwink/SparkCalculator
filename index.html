@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Spark Helper Prototype</title>
+  <title>RouteWorth</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
   <script src="aiParser.js" defer></script>
@@ -14,7 +14,7 @@
   <main class="app-shell">
     <header class="app-header">
       <div>
-        <p class="eyebrow">Spark Helper Prototype</p>
+        <p class="eyebrow">RouteWorth</p>
         <h1>Offer Check</h1>
       </div>
       <button class="icon-button" id="themeResetButton" type="button" aria-label="Reset app">Reset</button>
@@ -81,8 +81,28 @@
         </div>
       </div>
       <button class="route-button" id="getRouteButton" type="button">Get Google Route Time</button>
+      <button class="secondary-button route-secondary-button" id="useManualTimesButton" type="button">Use Manual Times</button>
       <p class="route-message" id="routeMessage"></p>
       <div class="warning-list" id="warningList" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" id="addresses" aria-labelledby="addresses-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="addresses-title">Route Addresses</h2>
+          <p>These are sent to your backend only when you press Get Google Route Time.</p>
+        </div>
+      </div>
+      <div class="field-grid">
+        <label class="wide">
+          <span>Store/Walmart address</span>
+          <textarea id="routeStoreAddress" rows="2" placeholder="Walmart OLEAN #2159, 1869 PLAZA DR, OLEAN, NY 14760"></textarea>
+        </label>
+        <label class="wide">
+          <span>Stop addresses, one per line</span>
+          <textarea id="routeStopAddresses" rows="4" placeholder="2323 Five Mile Rd, Allegany, NY 14706"></textarea>
+        </label>
+      </div>
     </section>
 
     <section class="panel detected-card is-hidden" id="detectedCard" aria-labelledby="detected-title">
@@ -234,6 +254,10 @@
           <dd id="analyticsScreenshots">0</dd>
         </div>
         <div>
+          <dt>Total route estimates requested</dt>
+          <dd id="analyticsRouteRequests">0</dd>
+        </div>
+        <div>
           <dt>Total corrections made</dt>
           <dd id="analyticsCorrections">0</dd>
         </div>
@@ -271,6 +295,24 @@
         <summary>Extracted text debug</summary>
         <pre id="ocrText">No OCR text yet.</pre>
       </details>
+      <div class="debug-snapshots">
+        <div>
+          <h3>Last OCR raw text</h3>
+          <pre id="debugLastOcr">None yet.</pre>
+        </div>
+        <div>
+          <h3>Last detected values</h3>
+          <pre id="debugLastDetected">None yet.</pre>
+        </div>
+        <div>
+          <h3>Last route response</h3>
+          <pre id="debugLastRoute">None yet.</pre>
+        </div>
+        <div>
+          <h3>Last calculation result</h3>
+          <pre id="debugLastCalculation">None yet.</pre>
+        </div>
+      </div>
       <div class="location-box">
         <h3>Detected location text</h3>
         <p id="locationText">No city, location, or address text detected yet.</p>
