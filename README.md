@@ -2,28 +2,21 @@
 
 RouteWorth is a mobile-friendly static web app for checking Spark offers quickly in a browser.
 
-It is designed for Cloudflare Pages:
-
-- Static frontend only
-- No build step
-- No npm required for the frontend
-- Optional Cloudflare Worker backend for Google route estimates
-
-## Main Workflow
+Current normal workflow:
 
 1. Upload screenshot(s).
 2. Analyze screenshot(s) with browser OCR.
-3. Review detected payout, miles, stops, store text, and dropoff text.
-4. Edit the Store/Walmart address and Stop addresses if needed.
-5. Press **Get Google Route Time** or **Use Manual Times**.
+3. Check or edit the Store/Walmart address and stop addresses.
+4. Tap **Open Route in Maps**.
+5. Enter the Maps drive time and Maps total miles.
 6. Review **Estimated Hourly AFTER GAS** near the top of the page.
-7. Export debug JSON when you want to improve the parser later.
+
+No API key is needed for the normal app workflow.
 
 ## Settings
 
 Settings are saved in browser `localStorage`:
 
-- Backend API URL
 - Preferred Walmart/store address
 - Minutes per stop
 - MPG
@@ -31,76 +24,56 @@ Settings are saved in browser `localStorage`:
 - Minimum acceptable hourly
 - Good hourly
 
-Backend API URL example:
+The future backend route service code is still included, but its UI is hidden for now.
+
+## Open In Maps
+
+RouteWorth builds a route link using:
 
 ```text
-https://my-worker-name.my-account.workers.dev
+Store/Walmart -> stop 1 -> stop 2 -> final stop -> Store/Walmart
 ```
 
-## Google Route Backend
+The return leg is controlled by **Include return to store**.
 
-The frontend calls:
+Platform behavior:
 
-```text
-POST /api/route-estimate
-```
+- iPhone, iPad, and macOS Safari try Apple Maps.
+- Android, Chrome, and other browsers use Google Maps.
+- Uncertain platforms default to Google Maps.
 
-Request body:
+After Maps opens, enter:
 
-```json
-{
-  "storeAddress": "string",
-  "stopAddresses": ["string", "string"],
-  "returnToStore": true
-}
-```
-
-Expected response:
-
-```json
-{
-  "success": true,
-  "driveTimeMinutes": 0,
-  "returnTimeMinutes": 0,
-  "totalGoogleDriveMinutes": 0,
-  "totalDistanceMiles": 0,
-  "legs": [],
-  "warnings": []
-}
-```
-
-The app auto-fills drive time, return time, total miles, and return miles when possible.
+- Maps drive time
+- Maps total miles
 
 ## Calculation
 
 ```text
 Stop Time = Stops x Minutes Per Stop
-Total Trip Time = Drive Time + Return Time + Stop Time
-Fuel Cost = Total Distance Miles / MPG x Gas Price
+Total Trip Time = Maps Drive Time + Stop Time
+Fuel Cost = Maps Total Miles / MPG x Gas Price
 Pay After Gas = Payout - Fuel Cost
 Hourly After Gas = Pay After Gas / (Total Trip Time / 60)
 ```
-
-When a Google route estimate exists, fuel cost uses `totalDistanceMiles` from the backend. Otherwise, it uses manual miles plus return miles.
 
 ## Data & Debug
 
 RouteWorth stores local debug events in browser `localStorage` for:
 
 - `screenshot_analysis`
-- `route_estimate_request`
-- `route_estimate_response`
+- `opened_maps_route`
 - `correction`
 - `calculation`
 
 The Data & Debug section shows:
 
 - Total screenshots analyzed
-- Total route estimates requested
+- Total maps routes opened
 - Total corrections made
 - Last OCR raw text
 - Last detected values
-- Last route response
+- Last route/map event
 - Last calculation result
 
 Use **Export Debug JSON** to download all local records as:
@@ -113,6 +86,17 @@ Use **Clear Debug Data** to remove local debug records.
 
 Debug data and screenshots are not uploaded automatically.
 
+## Future Route API
+
+The code keeps a future Cloudflare Worker / Google Routes API path in:
+
+- `routeService.js`
+- `worker/index.js`
+- `worker/README.md`
+- `worker/wrangler.toml.example`
+
+Future version: replace manual map opening with backend route estimate API.
+
 ## Frontend Files
 
 - `index.html`
@@ -121,14 +105,6 @@ Debug data and screenshots are not uploaded automatically.
 - `aiParser.js`
 - `routeService.js`
 - `README.md`
-
-## Worker Files
-
-- `worker/index.js`
-- `worker/README.md`
-- `worker/wrangler.toml.example`
-
-See [worker/README.md](worker/README.md) for Worker deployment steps and `GOOGLE_MAPS_API_KEY` setup.
 
 ## Test Locally
 
@@ -143,6 +119,5 @@ OCR requires internet access because Tesseract.js loads from a CDN. Manual entry
 3. Use no build command.
 4. Use `/` as the output directory.
 5. Deploy.
-6. Open RouteWorth and paste the Worker URL into **Settings > Backend API URL**.
 
 Open the deployed Pages URL on iPhone Safari or Android Chrome. No app install is required.

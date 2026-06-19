@@ -64,6 +64,8 @@
   }
 
   async function requestGoogleRouteEstimate(backendApiUrl, payload) {
+    // TODO: Future version: replace manual map opening with this backend route estimate API.
+    // Keep this helper parked until RouteWorth is ready for Cloudflare Worker + Google Routes.
     const baseUrl = normalizeBackendUrl(backendApiUrl);
     if (!baseUrl) {
       throw new Error("Backend API URL not set. Enter route times manually or add a backend URL in settings.");

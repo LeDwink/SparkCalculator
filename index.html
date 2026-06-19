@@ -56,11 +56,11 @@
       </div>
       <div class="result-grid">
         <div>
-          <span>Google Drive Time</span>
+          <span>Maps Drive Time</span>
           <strong id="driveTimeResult">0 min</strong>
         </div>
         <div>
-          <span>Google Return Time</span>
+          <span>Return Time</span>
           <strong id="returnTimeResult">0 min</strong>
         </div>
         <div>
@@ -80,7 +80,8 @@
           <strong id="stopTimeResult">0 min</strong>
         </div>
       </div>
-      <button class="route-button" id="getRouteButton" type="button">Get Google Route Time</button>
+      <button class="route-button future-hidden" id="getRouteButton" type="button">Get Google Route Time</button>
+      <button class="route-button" id="openMapsButton" type="button">Open Route in Maps</button>
       <button class="secondary-button route-secondary-button" id="useManualTimesButton" type="button">Use Manual Times</button>
       <p class="route-message" id="routeMessage"></p>
       <div class="warning-list" id="warningList" role="status" aria-live="polite"></div>
@@ -90,7 +91,7 @@
       <div class="section-heading">
         <div>
           <h2 id="addresses-title">Route Addresses</h2>
-          <p>These are sent to your backend only when you press Get Google Route Time.</p>
+          <p>These are used to build the Maps route link.</p>
         </div>
       </div>
       <div class="field-grid">
@@ -101,6 +102,10 @@
         <label class="wide">
           <span>Stop addresses, one per line</span>
           <textarea id="routeStopAddresses" rows="4" placeholder="2323 Five Mile Rd, Allegany, NY 14706"></textarea>
+        </label>
+        <label class="checkbox-row wide">
+          <input id="includeReturnToStore" type="checkbox" checked>
+          <span>Include return to store</span>
         </label>
       </div>
     </section>
@@ -159,7 +164,7 @@
             <input id="payout" type="number" inputmode="decimal" min="0" step="0.01" placeholder="30.00">
           </label>
           <label>
-            <span>Miles</span>
+            <span>Maps total miles</span>
             <input id="sparkMiles" type="number" inputmode="decimal" min="0" step="0.1" placeholder="15.2">
           </label>
           <label>
@@ -167,16 +172,16 @@
             <input id="stops" type="number" inputmode="numeric" min="0" step="1" placeholder="3">
           </label>
           <label>
-            <span>Google Drive Time</span>
+            <span>Maps drive time</span>
             <input id="driveTime" type="number" inputmode="numeric" min="0" step="1" placeholder="45">
           </label>
-          <label>
-            <span>Google Return Time</span>
-            <input id="returnTime" type="number" inputmode="numeric" min="0" step="1" placeholder="25">
+          <label class="future-hidden">
+            <span>Return Time</span>
+            <input id="returnTime" type="number" inputmode="numeric" min="0" step="1" value="0">
           </label>
-          <label>
+          <label class="future-hidden">
             <span>Return miles</span>
-            <input id="returnMiles" type="number" inputmode="decimal" min="0" step="0.1" placeholder="15.2">
+            <input id="returnMiles" type="number" inputmode="decimal" min="0" step="0.1" value="0">
           </label>
         </div>
         <div class="quick-row">
@@ -203,7 +208,7 @@
           <span>Preferred Walmart</span>
           <input id="preferredWalmart" type="text" placeholder="Walmart OLEAN #2159">
         </label>
-        <label class="wide">
+        <label class="wide future-hidden">
           <span>Backend API URL</span>
           <input id="backendApiUrl" type="url" placeholder="https://my-worker-name.my-account.workers.dev">
         </label>
@@ -254,7 +259,7 @@
           <dd id="analyticsScreenshots">0</dd>
         </div>
         <div>
-          <dt>Total route estimates requested</dt>
+          <dt>Total maps routes opened</dt>
           <dd id="analyticsRouteRequests">0</dd>
         </div>
         <div>

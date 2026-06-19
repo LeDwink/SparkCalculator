@@ -204,6 +204,10 @@ input[type="file"] {
   margin-top: 9px;
 }
 
+.future-hidden {
+  display: none !important;
+}
+
 .secondary-button,
 .icon-button,
 .small-button,
@@ -446,6 +450,29 @@ label span {
 label {
   display: grid;
   gap: 6px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(8, 9, 13, 0.62);
+}
+
+.checkbox-row input {
+  width: 22px;
+  min-height: 22px;
+  accent-color: var(--blue);
+}
+
+.checkbox-row span {
+  color: var(--text);
+  font-size: 0.98rem;
+  text-transform: none;
 }
 
 input,

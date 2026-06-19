@@ -18,7 +18,8 @@ const fields = {
   backendApiUrl: document.querySelector("#backendApiUrl"),
   mainTimeDisplay: document.querySelector("#mainTimeDisplay"),
   routeStoreAddress: document.querySelector("#routeStoreAddress"),
-  routeStopAddresses: document.querySelector("#routeStopAddresses")
+  routeStopAddresses: document.querySelector("#routeStopAddresses"),
+  includeReturnToStore: document.querySelector("#includeReturnToStore")
 };
 
 const detectedInputs = {
@@ -46,6 +47,7 @@ const useDetectedButton = document.querySelector("#useDetectedButton");
 const calculateDetectedButton = document.querySelector("#calculateDetectedButton");
 const clearScreenshotsButton = document.querySelector("#clearScreenshotsButton");
 const getRouteButton = document.querySelector("#getRouteButton");
+const openMapsButton = document.querySelector("#openMapsButton");
 const useManualTimesButton = document.querySelector("#useManualTimesButton");
 const exportDebugButton = document.querySelector("#exportDebugButton");
 const clearDebugButton = document.querySelector("#clearDebugButton");
@@ -173,6 +175,60 @@ function getStoreAddress() {
   return fields.routeStoreAddress.value.trim() || detectedInputs.pickupText.value.trim() || fields.preferredWalmart.value.trim();
 }
 
+function shouldUseAppleMaps() {
+  const userAgent = navigator.userAgent || "";
+  const vendor = navigator.vendor || "";
+  const isAppleDevice = /iPhone|iPad|iPod|Macintosh/i.test(userAgent);
+  const isSafari = /Safari/i.test(userAgent) && !/Chrome|CriOS|Chromium|FxiOS|Edg/i.test(userAgent) && /Apple/i.test(vendor);
+  return isAppleDevice && isSafari;
+}
+
+function mapsEncode(value) {
+  return encodeURIComponent(value);
+}
+
+function buildGoogleMapsUrl(storeAddress, stopAddresses, includeReturnToStore) {
+  const orderedStops = includeReturnToStore ? [...stopAddresses, storeAddress] : stopAddresses;
+  const destination = orderedStops[orderedStops.length - 1] || storeAddress;
+  const waypoints = orderedStops.slice(0, -1);
+  const params = [
+    ["api", "1"],
+    ["origin", storeAddress],
+    ["destination", destination],
+    ["travelmode", "driving"]
+  ];
+
+  if (waypoints.length) {
+    params.push(["waypoints", waypoints.join("|")]);
+  }
+
+  return `https://www.google.com/maps/dir/?${params.map(([key, value]) => `${mapsEncode(key)}=${mapsEncode(value)}`).join("&")}`;
+}
+
+function buildAppleMapsUrl(storeAddress, stopAddresses, includeReturnToStore) {
+  const orderedStops = includeReturnToStore ? [...stopAddresses, storeAddress] : stopAddresses;
+  const destination = orderedStops.join(" to ") || storeAddress;
+  return `https://maps.apple.com/?saddr=${mapsEncode(storeAddress)}&daddr=${mapsEncode(destination)}&dirflg=d`;
+}
+
+function buildMapsRoute() {
+  const storeAddress = getStoreAddress();
+  const stopAddresses = getStopAddresses();
+  const includeReturnToStore = fields.includeReturnToStore.checked;
+  const mapsProvider = shouldUseAppleMaps() ? "apple" : "google";
+  const mapsUrl = mapsProvider === "apple"
+    ? buildAppleMapsUrl(storeAddress, stopAddresses, includeReturnToStore)
+    : buildGoogleMapsUrl(storeAddress, stopAddresses, includeReturnToStore);
+
+  return {
+    storeAddress,
+    stopAddresses,
+    includeReturnToStore,
+    mapsProvider,
+    mapsUrl
+  };
+}
+
 function getDetectedValues() {
   return {
     payout: optionalNumber(detectedInputs.payout),
@@ -270,7 +326,7 @@ function fieldGroup(fieldName) {
 function summarizeCorrections() {
   const records = readDebugRecords();
   const correctionRecords = records.filter((record) => record.eventType === "correction");
-  const routeRequestCount = records.filter((record) => record.eventType === "route_estimate_request").length;
+  const routeRequestCount = records.filter((record) => record.eventType === "opened_maps_route").length;
   const screenshotCount = records
     .filter((record) => record.eventType === "screenshot_analysis")
     .reduce((sum, record) => sum + (Number(record.screenshotCount) || 1), 0);
@@ -334,13 +390,19 @@ function setDebugJson(selector, value) {
 
 function renderDebugSnapshots() {
   const lastScreenshot = findLastRecord("screenshot_analysis");
-  const lastRouteResponse = findLastRecord("route_estimate_response");
+  const lastRouteResponse = findLastRecord("opened_maps_route") || findLastRecord("route_estimate_response");
   const lastCalculation = findLastRecord("calculation");
 
   const lastOcr = document.querySelector("#debugLastOcr");
   if (lastOcr) lastOcr.textContent = lastScreenshot?.rawOcrText || "None yet.";
   setDebugJson("#debugLastDetected", lastScreenshot?.detectedValues || null);
-  setDebugJson("#debugLastRoute", lastRouteResponse?.routeError ? {
+  setDebugJson("#debugLastRoute", lastRouteResponse?.mapsUrl ? {
+    mapsProvider: lastRouteResponse.mapsProvider,
+    storeAddress: lastRouteResponse.storeAddress,
+    stopAddresses: lastRouteResponse.stopAddresses,
+    includeReturnToStore: lastRouteResponse.includeReturnToStore,
+    mapsUrl: lastRouteResponse.mapsUrl
+  } : lastRouteResponse?.routeError ? {
     error: lastRouteResponse.routeError,
     routeEstimate: lastRouteResponse.routeEstimate
   } : lastRouteResponse?.routeEstimate || null);
@@ -430,9 +492,9 @@ function calculate(options = {}) {
   if (payoutMissing) warnings.push("Missing payout. Enter the offer payout or rerun screenshot analysis.");
   if (milesMissing) warnings.push("Miles are missing. Enter offer miles or rerun screenshot analysis.");
   if (stopsMissing) warnings.push("Missing stops. Enter the number of stops or rerun screenshot analysis.");
-  if (driveTimeMissing) warnings.push("Google Drive Time is missing. Enter the route drive estimate.");
-  if (returnTimeMissing) warnings.push("Google Return Time is missing. Enter the return-to-Walmart estimate.");
-  if (totalTimeMinutes > 0 && totalTimeMinutes < 10) warnings.push("Total time is under 10 minutes. Check Google drive time, return time, and stop time.");
+  if (driveTimeMissing) warnings.push("Maps drive time is missing. Open Maps, then enter the route time.");
+  if (returnTimeMissing && numberValue(fields.returnTime) !== 0) warnings.push("Return time is missing.");
+  if (totalTimeMinutes > 0 && totalTimeMinutes < 10) warnings.push("Total time is under 10 minutes. Check Maps drive time and stop time.");
   if (hourlyAfterGas > 60) warnings.push("This result may be wrong. Check drive time, return time, and OCR values.");
   if (payout < 10 && hourlyAfterGas > 40) warnings.push("Low payout with high hourly detected. Check drive time, return time, and OCR values.");
   if (lastRouteEstimate?.warnings?.length) warnings.push(...lastRouteEstimate.warnings);
@@ -460,7 +522,7 @@ function calculate(options = {}) {
   resultCard.className = `result-card verdict-${verdict.toLowerCase()}`;
   document.querySelector("#verdictLabel").textContent = `${verdict} Offer`;
   document.querySelector("#hourlyAfterGas").textContent = `${money(hourlyAfterGas)}/hr`;
-  document.querySelector("#routeSource").textContent = route.source === "google" ? "Google route" : "Manual route";
+  document.querySelector("#routeSource").textContent = route.source === "google" ? "Future API route" : "Manual Maps";
   document.querySelector("#driveTimeResult").textContent = formatMinutes(driveTimeMinutes);
   document.querySelector("#returnTimeResult").textContent = formatMinutes(returnTimeMinutes);
   document.querySelector("#fuelCost").textContent = money(fuelCost);
@@ -469,7 +531,7 @@ function calculate(options = {}) {
   document.querySelector("#stopTimeResult").textContent = formatMinutes(stopTime);
 
   if (fields.mainTimeDisplay.value === "drive") {
-    document.querySelector("#mainTimeLabel").textContent = "Google Drive Time Only";
+    document.querySelector("#mainTimeLabel").textContent = "Maps Drive Time Only";
     document.querySelector("#mainTimeValue").textContent = formatMinutes(driveTimeMinutes);
   } else {
     document.querySelector("#mainTimeLabel").textContent = "Estimated Trip Time";
@@ -643,7 +705,28 @@ function applyRouteEstimate(route) {
   calculate();
 }
 
+function openRouteInMaps() {
+  const route = buildMapsRoute();
+  if (!route.storeAddress || !route.stopAddresses.length) {
+    routeMessage.textContent = "Store or stop addresses are missing. Check the route address fields.";
+    return;
+  }
+
+  saveDebugRecord("opened_maps_route", {
+    storeAddress: route.storeAddress,
+    stopAddresses: route.stopAddresses,
+    includeReturnToStore: route.includeReturnToStore,
+    mapsProvider: route.mapsProvider,
+    mapsUrl: route.mapsUrl
+  });
+
+  routeMessage.textContent = "Enter the Maps time and distance below to calculate hourly after gas.";
+  window.open(route.mapsUrl, "_blank", "noopener,noreferrer");
+}
+
 async function getGoogleRouteTime() {
+  // TODO: Future version: replace manual map opening with backend route estimate API.
+  // This function is intentionally kept for the future Cloudflare Worker / Google Routes path.
   const backendApiUrl = fields.backendApiUrl.value.trim();
   if (!backendApiUrl) {
     routeMessage.textContent = "Backend API URL not set. Enter it in Settings or use manual times.";
@@ -750,6 +833,7 @@ screenshotInput.addEventListener("change", () => {
 analyzeButton.addEventListener("click", analyzeScreenshots);
 clearScreenshotsButton.addEventListener("click", clearScreenshots);
 getRouteButton.addEventListener("click", getGoogleRouteTime);
+openMapsButton.addEventListener("click", openRouteInMaps);
 useManualTimesButton.addEventListener("click", useManualTimes);
 useDetectedButton.addEventListener("click", useDetectedValues);
 calculateDetectedButton.addEventListener("click", () => {
@@ -795,6 +879,10 @@ Object.entries(fields).forEach(([fieldName, field]) => {
     recordCorrection(detectedFieldName, detectedInput.dataset.originalValue, field.value);
     detectedInput.dataset.originalValue = normalizeCorrectionValue(field.value);
   });
+});
+
+fields.includeReturnToStore.addEventListener("change", () => {
+  lastRouteEstimate = null;
 });
 
 document.querySelector("#matchReturnButton").addEventListener("click", () => {
